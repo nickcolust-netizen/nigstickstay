@@ -44,7 +44,7 @@ import './style.css';
 
         <div class="form-row">
             <div class="form-group">
-                <label for="department">แผนกงาน</label>
+                <label for="department">สังกัด/สายงาน</label>
                 <input type="text" id="department" required>
             </div>
             <div class="form-group">
@@ -82,28 +82,38 @@ const passwordInput = document.getElementById('password');
 const confirmPasswordInput = document.getElementById('confirm_password');
 const alertBox = document.getElementById('alert-box');
 
-// 🛠️ 1. ดักจับตอนพิมพ์ของ Username (ยอมรับแค่ A-Z, a-z, 0-9, _, -)
+// 🛠️ 1. ดักจับตอนพิมพ์ของ Username
 usernameInput.addEventListener('input', function(e) {
     const invalidChars = /[^a-zA-Z0-9_\-]/g;
     if (invalidChars.test(this.value)) {
-        this.value = this.value.replace(invalidChars, ''); // ลบตัวอักษรที่ไม่ใช่ภาษาอังกฤษทิ้งทันที
-        showAlert("ชื่อผู้ใช้ (Username) สามารถพิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และเครื่องหมาย _ - เท่านั้น", "danger");
+        this.value = this.value.replace(invalidChars, ''); // ลบอักษรที่ไม่ใช่ข้อกำหนดออกทันที
+        showAlert("ชื่อผู้ใช้ (Username) พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และเครื่องหมาย _ - เท่านั้น", "danger");
+    } else {
+        // 🛠️ ถ้าย้อนกลับมาพิมพ์ถูกแล้ว ให้ปิดกล่องแจ้งเตือนทันที
+        hideAlert();
     }
 });
 
-// 🛠️ 2. ดักจับตอนพิมพ์ของ Password (ยอมรับอังกฤษ ตัวเลข และสัญลักษณ์สากล)
+// 🛠️ 2. ดักจับตอนพิมพ์ของ Password
 const passwordRegex = /[^a-zA-Z0-9_@.\-#$!%*?&]/g;
 passwordInput.addEventListener('input', function(e) {
     if (passwordRegex.test(this.value)) {
         this.value = this.value.replace(passwordRegex, '');
-        showAlert("รหัสผ่าน (Password) สามารถพิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์สากลเท่านั้น", "danger");
+        showAlert("รหัสผ่าน (Password) พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์สากลเท่านั้น", "danger");
+    } else {
+        // 🛠️ ถ้าย้อนกลับมาพิมพ์ถูกแล้ว ให้ปิดกล่องแจ้งเตือนทันที
+        hideAlert();
     }
 });
 
+// 🛠️ 3. ดักจับตอนพิมพ์ของ Confirm Password
 confirmPasswordInput.addEventListener('input', function(e) {
     if (passwordRegex.test(this.value)) {
         this.value = this.value.replace(passwordRegex, '');
-        showAlert("การยืนยันรหัสผ่าน สามารถพิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์สากลเท่านั้น", "danger");
+        showAlert("การยืนยันรหัสผ่าน พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์สากลเท่านั้น", "danger");
+    } else {
+        // 🛠️ ถ้าย้อนกลับมาพิมพ์ถูกแล้ว ให้ปิดกล่องแจ้งเตือนทันที
+        hideAlert();
     }
 });
 
@@ -129,8 +139,20 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     const password = passwordInput.value;
     const confirmPassword = confirmPasswordInput.value;
 
-    alertBox.style.display = 'none';
-    alertBox.className = 'alert';
+    hideAlert();
+
+    // ตรวจสอบความถูกต้องอีกรอบตอนกดส่ง (เผื่อกรณีลากวาง)
+    const usernameCheck = /^[a-zA-Z0-9_\-]+$/;
+    if (!usernameCheck.test(userName)) {
+        showAlert("ชื่อผู้ใช้ (Username) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือเครื่องหมาย _ และ - เท่านั้น", "danger");
+        return;
+    }
+
+    const passwordCheck = /^[a-zA-Z0-9_@.\-#$!%*?&]+$/; 
+    if (!passwordCheck.test(password) || !passwordCheck.test(confirmPassword)) {
+        showAlert("รหัสผ่านต้องเป็นภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์สากลเท่านั้น", "danger");
+        return;
+    }
 
     // ตรวจสอบรหัสผ่านตรงกันไหม
     if (password !== confirmPassword) {
@@ -167,7 +189,8 @@ document.getElementById('registerForm').addEventListener('submit', async functio
 
         if (response.status === 201) {
             showAlert("สมัครสมาชิกสำเร็จเรียบร้อยแล้ว!", "success");
-            document.getElementById('registerForm').reset(); 
+            document.getElementById('registerForm').reset();
+            <href="/index">
         } else {
             showAlert("เกิดข้อผิดพลาด: ชื่อผู้ใช้ หรืออีเมลนี้อาจถูกใช้งานไปแล้ว", "danger");
         }
@@ -184,6 +207,12 @@ function showAlert(text, type) {
     alertBox.innerText = text;
     alertBox.className = `alert alert-${type}`;
     alertBox.style.display = 'block';
+}
+
+// 🛠️ ฟังก์ชันสำหรับซ่อนแจ้งเตือน
+function hideAlert() {
+    alertBox.style.display = 'none';
+    alertBox.innerText = '';
 }
 </script>
 
