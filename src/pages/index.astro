@@ -24,7 +24,7 @@ import './style.css';
     <form id="loginForm">
         <div class="form-group">
             <label for="username">ชื่อผู้ใช้ (Username)</label>
-            <input type="text" id="username" pattern="^[a-zA-Z0-9_\-]+$" title="กรุณาใช้ภาษาอังกฤษ ตัวเลข หรือเครื่องหมาย _ - เท่านั้น" required>
+            <input type="text" id="username" required>
         </div>
 
         <div class="form-group">
@@ -46,6 +46,28 @@ import './style.css';
 const SUPABASE_URL = "https://xkefwusrblrzylvtmwte.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrZWZ3dXNyYmxyenlsdnRtd3RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MjU1NjcsImV4cCI6MjA5OTIwMTU2N30.LMb9yfwpHQoZm30z7QwWJSL8eJ68n7qU8DiItlz0QwQ";
 
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+const alertBox = document.getElementById('alert-box');
+
+// 🛠️ 1. ดักจับตอนพิมพ์ของ Username (ยอมรับแค่ A-Z, a-z, 0-9, _, -)
+usernameInput.addEventListener('input', function(e) {
+    const invalidChars = /[^a-zA-Z0-9_\-]/g;
+    if (invalidChars.test(this.value)) {
+        this.value = this.value.replace(invalidChars, ''); // ลบตัวอักษรไทย/สัญลักษณ์แปลกปลอมออกทันที
+        showAlert("ชื่อผู้ใช้ (Username) พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และเครื่องหมาย _ - เท่านั้น", "danger");
+    }
+});
+
+// 🛠️ 2. ดักจับตอนพิมพ์ของ Password (ยอมรับอังกฤษ ตัวเลข และสัญลักษณ์สากล)
+const passwordRegex = /[^a-zA-Z0-9_@.\-#$!%*?&]/g;
+passwordInput.addEventListener('input', function(e) {
+    if (passwordRegex.test(this.value)) {
+        this.value = this.value.replace(passwordRegex, ''); // ลบอักษรที่ไม่ใช่ข้อกำหนดทอนออกทันที
+        showAlert("รหัสผ่าน (Password) พิมพ์ได้เฉพาะภาษาอังกฤษ ตัวเลข และสัญลักษณ์สากลเท่านั้น", "danger");
+    }
+});
+
 // ฟังก์ชันแฮชรหัสผ่าน SHA-256
 async function hashPassword(string) {
     const utf8 = new TextEncoder().encode(string);
@@ -57,26 +79,23 @@ async function hashPassword(string) {
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    const alertBox = document.getElementById('alert-box');
     const btnSubmit = document.getElementById('btnSubmit');
-    
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
 
     alertBox.style.display = 'none';
     alertBox.className = 'alert';
 
-    // 🛠️ 1. ตรวจสอบว่า Username เป็นภาษาอังกฤษ/ตัวเลข เท่านั้น
-    const usernameRegex = /^[a-zA-Z0-9_\-]+$/;
-    if (!usernameRegex.test(username)) {
+    // ตรวจสอบความถูกต้องอีกรอบตอนกดส่งเผื่อมีข้อมูลหลุดรอดการสแกน (เช่น การก๊อปปี้วาง)
+    const usernameCheck = /^[a-zA-Z0-9_\-]+$/;
+    if (!usernameCheck.test(username)) {
         showAlert("ชื่อผู้ใช้ (Username) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือเครื่องหมาย _ และ - เท่านั้น", "danger");
         return;
     }
 
-    // 🛠️ 2. ตรวจสอบว่า Password ไม่มีภาษาไทยปนมา
-    const passwordRegex = /^[a-zA-Z0-9_@.\-#$!%*?&]+$/; 
-    if (!passwordRegex.test(password)) {
-        showAlert("รหัสผ่าน (Password) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์สากลเท่านั้น (ห้ามใช้ภาษาไทย)", "danger");
+    const passwordCheck = /^[a-zA-Z0-9_@.\-#$!%*?&]+$/; 
+    if (!passwordCheck.test(password)) {
+        showAlert("รหัสผ่าน (Password) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์สากลเท่านั้น", "danger");
         return;
     }
 
@@ -84,7 +103,6 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     btnSubmit.innerText = "กำลังตรวจสอบข้อมูล...";
 
     try {
-        // เงื่อนไขการค้นหาใน API จาก username=eq....
         const response = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(username)}`, {
             method: 'GET',
             headers: {
@@ -103,17 +121,14 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 
         const user = users[0];
 
-        // ตรวจสอบว่าโดนระงับสิทธิ์อยู่หรือไม่
         if (user.is_suspended) {
             showAlert("บัญชีผู้ใช้ของคุณถูกระงับชั่วคราว โปรดติดต่อเจ้าหน้าที่", "danger");
             return;
         }
 
-        // แฮชรหัสผ่านที่กรอกเข้ามาเทียบกับในฐานข้อมูล
         const hashedPassword = await hashPassword(password);
 
         if (user.password_hash === hashedPassword) {
-            // ถ้ารหัสถูก -> รีเซ็ตจำนวนครั้งที่ผิดกลับเป็น 0
             await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`, {
                 method: 'PATCH',
                 headers: {
@@ -128,11 +143,9 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
             showAlert("เข้าสู่ระบบสำเร็จ!", "success");
             // window.location.href = '/dashboard';
         } else {
-            // ถ้ารหัสผิด -> นับจำนวนเพิ่มขึ้น 1
             const newAttempts = user.login_attempts + 1;
 
             if (newAttempts >= 3) {
-                // หากผิดตั้งแต่ 3 ครั้งขึ้นไป -> อัปเดตสถานะเป็นระงับ (is_suspended = true)
                 await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`, {
                     method: 'PATCH',
                     headers: {
@@ -146,7 +159,6 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 
                 showAlert("คุณกรอกรหัสผ่านผิดเกิน 3 ครั้ง บัญชีถูกระงับ โปรดติดต่อเจ้าหน้าที่", "danger");
             } else {
-                // ผิดแต่ยังไม่ถึง 3 ครั้ง -> อัปเดตยอดสะสมความผิดพลาด
                 await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`, {
                     method: 'PATCH',
                     headers: {
@@ -171,7 +183,6 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 });
 
 function showAlert(text, type) {
-    const alertBox = document.getElementById('alert-box');
     alertBox.innerText = text;
     alertBox.style.display = 'block';
     alertBox.className = `alert alert-${type}`;
