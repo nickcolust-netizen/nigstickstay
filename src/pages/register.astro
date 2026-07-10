@@ -35,7 +35,7 @@ import './style.css';
         <button type="submit" class="btn-submit" id="btnSubmit">เข้าสู่ระบบ</button>
         
         <div style="text-align: center; margin-top: 15px;">
-            <a href="/index.astro" class="btn-secondary" style="text-decoration: none; color: #555; font-size: 14px;">
+            <a href="./register" class="btn-secondary" style="text-decoration: none; color: #555; font-size: 14px;">
                 ยังไม่มีบัญชี? สมัครสมาชิกที่นี่
             </a>
         </div>
@@ -60,7 +60,6 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     const alertBox = document.getElementById('alert-box');
     const btnSubmit = document.getElementById('btnSubmit');
     
-    // เปลี่ยนการดึงค่าจาก email เป็น username
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
 
@@ -71,7 +70,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     btnSubmit.innerText = "กำลังตรวจสอบข้อมูล...";
 
     try {
-        // 1. เปลี่ยนเงื่อนไขการค้นหาใน API จาก email เป็น username=eq....
+        // 1. เงื่อนไขการค้นหาใน API จาก username=eq....
         const response = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(username)}`, {
             method: 'GET',
             headers: {
