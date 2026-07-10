@@ -1,0 +1,169 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import './style.css';
+---
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>เข้าสู่ระบบ</title>
+</head>
+<body>
+
+<div class="register-container">
+    <h2>เข้าสู่ระบบ</h2>
+
+    <div id="alert-box" class="alert" style="display: none;"></div>
+
+    <form id="loginForm">
+        <div class="form-group">
+            <label for="username">ชื่อผู้ใช้ (Username)</label>
+            <input type="text" id="username" required>
+        </div>
+
+        <div class="form-group">
+            <label for="password">รหัสผ่าน</label>
+            <input type="password" id="password" required>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btnSubmit">เข้าสู่ระบบ</button>
+        
+        <div style="text-align: center; margin-top: 15px;">
+            <a href="/register" class="btn-secondary" style="text-decoration: none; color: #555; font-size: 14px;">
+                ยังไม่มีบัญชี? สมัครสมาชิกที่นี่
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+const SUPABASE_URL = "https://xkefwusrblrzylvtmwte.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrZWZ3dXNyYmxyenlsdnRtd3RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MjU1NjcsImV4cCI6MjA5OTIwMTU2N30.LMb9yfwpHQoZm30z7QwWJSL8eJ68n7qU8DiItlz0QwQ";
+
+// ฟังก์ชันแฮชรหัสผ่าน SHA-256
+async function hashPassword(string) {
+    const utf8 = new TextEncoder().encode(string);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(bytes => bytes.toString(16).padStart(2, '0')).join('');
+}
+
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const alertBox = document.getElementById('alert-box');
+    const btnSubmit = document.getElementById('btnSubmit');
+    
+    // เปลี่ยนการดึงค่าจาก email เป็น username
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    alertBox.style.display = 'none';
+    alertBox.className = 'alert';
+
+    btnSubmit.disabled = true;
+    btnSubmit.innerText = "กำลังตรวจสอบข้อมูล...";
+
+    try {
+        // 1. เปลี่ยนเงื่อนไขการค้นหาใน API จาก email เป็น username=eq....
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(username)}`, {
+            method: 'GET',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const users = await response.json();
+
+        if (users.length === 0) {
+            showAlert("ไม่พบข้อมูลผู้ใช้งานในระบบ", "danger");
+            return;
+        }
+
+        const user = users[0];
+
+        // 2. ตรวจสอบว่าโดนระงับสิทธิ์อยู่หรือไม่
+        if (user.is_suspended) {
+            showAlert("บัญชีผู้ใช้ของคุณถูกระงับชั่วคราว โปรดติดต่อเจ้าหน้าที่", "danger");
+            return;
+        }
+
+        // 3. แฮชรหัสผ่านที่กรอกเข้ามาเทียบกับในฐานข้อมูล
+        const hashedPassword = await hashPassword(password);
+
+        if (user.password_hash === hashedPassword) {
+            // ถ้ารหัสถูก -> รีเซ็ตจำนวนครั้งที่ผิดกลับเป็น 0
+            await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify({ login_attempts: 0 })
+            });
+
+            showAlert("เข้าสู่ระบบสำเร็จ!", "success");
+            // window.location.href = '/dashboard';
+        } else {
+            // ถ้ารหัสผิด -> นับจำนวนเพิ่มขึ้น 1
+            const newAttempts = user.login_attempts + 1;
+
+            if (newAttempts >= 3) {
+                // หากผิดตั้งแต่ 3 ครั้งขึ้นไป -> อัปเดตสถานะเป็นระงับ (is_suspended = true)
+                await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({ login_attempts: newAttempts, is_suspended: true })
+                });
+
+                showAlert("คุณกรอกรหัสผ่านผิดเกิน 3 ครั้ง บัญชีถูกระงับ โปรดติดต่อเจ้าหน้าที่", "danger");
+            } else {
+                // ผิดแต่ยังไม่ถึง 3 ครั้ง -> อัปเดตยอดสะสมความผิดพลาด
+                await fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${user.id}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
+                    body: JSON.stringify({ login_attempts: newAttempts })
+                });
+
+                showAlert(`รหัสผ่านไม่ถูกต้อง (คุณลองผิดไปแล้ว ${newAttempts}/3 ครั้ง)`, "danger");
+            }
+        }
+    } catch (error) {
+        showAlert("เกิดข้อผิดพลาดในการเชื่อมต่อระบบ", "danger");
+        console.error(error);
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = "เข้าสู่ระบบ";
+    }
+});
+
+function showAlert(text, type) {
+    const alertBox = document.getElementById('alert-box');
+    alertBox.innerText = text;
+    alertBox.style.display = 'block';
+    alertBox.className = `alert alert-${type}`;
+}
+</script>
+
+</body>
+</html>
