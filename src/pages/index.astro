@@ -24,7 +24,7 @@ import './style.css';
     <form id="registerForm">
         <div class="form-row">
             <div class="form-group">
-                <label for="username">ชื่อผู้ใช้/ีusername</label>
+                <label for="username">ชื่อผู้ใช้/username</label>
                 <input type="text" id="username" required>
             </div>
             <div class="form-group">
@@ -68,12 +68,20 @@ import './style.css';
 </div>
 
 <script>
-// ⚠️ ใส่ข้อมูล Supabase ของคุณตรงนี้
 const SUPABASE_URL = "https://xkefwusrblrzylvtmwte.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrZWZ3dXNyYmxyenlsdnRtd3RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MjU1NjcsImV4cCI6MjA5OTIwMTU2N30.LMb9yfwpHQoZm30z7QwWJSL8eJ68n7qU8DiItlz0QwQ";
 
+// ฟังก์ชันสำหรับแฮชรหัสผ่านด้วย SHA-256 (Web Crypto API)
+async function hashPassword(string) {
+    const utf8 = new TextEncoder().encode(string);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(bytes => bytes.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
 document.getElementById('registerForm').addEventListener('submit', async function(e) {
-    e.preventDefault(); // ป้องกันการรีโหลดหน้าจอ
+    e.preventDefault(); 
     
     const alertBox = document.getElementById('alert-box');
     const btnSubmit = document.getElementById('btnSubmit');
@@ -88,7 +96,6 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirm_password').value;
 
-    // ซ่อนการแจ้งเตือนเก่าก่อน
     alertBox.style.display = 'none';
     alertBox.className = 'alert';
 
@@ -102,19 +109,21 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     btnSubmit.disabled = true;
     btnSubmit.innerText = "กำลังบันทึกข้อมูล...";
 
-    // เตรียมข้อมูลส่งในรูปแบบ JSON (ชื่อคีย์ต้องตรงกับคอลัมน์ใน SQL)
-    // หมายเหตุ: ฝั่ง JavaScript แนะนำให้บันทึกแบบ password ตรงๆ หรือแฮชฝั่ง Client ก่อนส่ง
-    const formData = {
-        username: username,
-        email: email,
-        password_hash: password, // ในระบบจริงควรต่อยอดทำเรื่อง Auth หรือแฮชรหัสผ่าน
-        first_name: firstName,
-        last_name: lastName,
-        department: department,
-        phone: phone
-    };
-
     try {
+        // ทำการแฮชรหัสผ่านก่อนส่งไปที่ฐานข้อมูล
+        const hashedPassword = await hashPassword(password);
+
+        // เตรียมข้อมูลส่งในรูปแบบ JSON (แก้ไขตัวแปร username ให้ถูกต้อง)
+        const formData = {
+            username: userName, 
+            email: email,
+            password_hash: hashedPassword, // ส่งรหัสผ่านที่แฮชแล้วไปเก็บ
+            first_name: firstName,
+            last_name: lastName,
+            department: department,
+            phone: phone
+        };
+
         // ยิง Fetch API ไปที่ Supabase REST Endpoint
         const response = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
             method: 'POST',
@@ -129,7 +138,7 @@ document.getElementById('registerForm').addEventListener('submit', async functio
 
         if (response.status === 201) {
             showAlert("สมัครสมาชิกสำเร็จเรียบร้อยแล้ว!", "success");
-            document.getElementById('registerForm').reset(); // ล้างข้อมูลในฟอร์ม
+            document.getElementById('registerForm').reset(); 
         } else {
             showAlert("เกิดข้อผิดพลาด: อีเมลนี้อาจถูกใช้งานไปแล้ว หรือระบบขัดข้อง", "danger");
         }
@@ -137,13 +146,11 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         showAlert("ไม่สามารถเชื่อมต่อฐานข้อมูลได้", "danger");
         console.error(error);
     } finally {
-        // คืนสถานะปุ่ม
         btnSubmit.disabled = false;
         btnSubmit.innerText = "ลงทะเบียน";
     }
 });
 
-// ฟังก์ชันสำหรับควบคุมกล่องข้อความแจ้งเตือน
 function showAlert(text, type) {
     const alertBox = document.getElementById('alert-box');
     alertBox.innerText = text;
