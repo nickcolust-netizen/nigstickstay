@@ -5,70 +5,6 @@ import Footer from '../components/Footer.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 ---
 
-<?php
-$message = "";
-$message_type = "";
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // รับค่าจากฟอร์ม
-    $first_name = trim($_POST['first_name']);
-    $last_name = trim($_POST['last_name']);
-    $email = trim($_POST['email']);
-    $department = trim($_POST['department']);
-    $phone = trim($_POST['phone']);
-    $password = $_POST['password'];
-    $confirm_password = $_POST['confirm_password'];
-
-    // ตรวจสอบความถูกต้องเบื้องต้น
-    if ($password !== $confirm_password) {
-        $message = "รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน";
-        $message_type = "danger";
-    } else {
-        // เข้ารหัสรหัสผ่านเพื่อความปลอดภัย (บดบังรหัสผ่านจริง)
-        $password_hash = password_hash($password, PASSWORD_BCRYPT);
-
-        // ตั้งค่าการเชื่อมต่อ Supabase REST API
-        $supabase_url = "https://YOUR_SUPABASE_URL.supabase.co/rest/v1/users";
-        $supabase_key = "YOUR_SUPABASE_ANON_KEY";
-
-        // เตรียมข้อมูลส่งในรูปแบบ JSON
-        $data = array(
-            "email" => $email,
-            "password_hash" => $password_hash,
-            "first_name" => $first_name,
-            "last_name" => $last_name,
-            "department" => $department,
-            "phone" => $phone
-        );
-
-        // ส่งข้อมูลด้วย cURL
-        $ch = curl_init($supabase_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-            "apikey: " . $supabase_key,
-            "Authorization: Bearer " . $supabase_key,
-            "Content-Type: application/json",
-            "Prefer: return=minimal" // ลดการส่งข้อมูลกลับเพื่อความเร็ว
-        ));
-
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        // ตรวจสอบสถานะการบันทึก (201 Created คือสำเร็จ)
-        if ($http_code == 201) {
-            $message = "สมัครสมาชิกสำเร็จเรียบร้อยแล้ว!";
-            $message_type = "success";
-        } else {
-            $message = "เกิดข้อผิดพลาด: อีเมลนี้อาจถูกใช้งานไปแล้ว หรือระบบขัดข้อง";
-            $message_type = "danger";
-        }
-    }
-}
-?>
-
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -82,53 +18,132 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <div class="register-container">
     <h2>สมัครสมาชิก</h2>
 
-    <?php if (!empty($message)): ?>
-        <div class="alert alert-<?php echo $message_type; ?>">
-            <?php echo $message; ?>
-        </div>
-    <?php endif; ?>
+    <div id="alert-box" class="alert" style="display: none;"></div>
 
-    <form action="register.php" method="POST">
+    <form id="registerForm">
         <div class="form-row">
             <div class="form-group">
                 <label for="first_name">ชื่อ</label>
-                <input type="text" id="first_name" name="first_name" required>
+                <input type="text" id="first_name" required>
             </div>
             <div class="form-group">
                 <label for="last_name">นามสกุล</label>
-                <input type="text" id="last_name" name="last_name" required>
+                <input type="text" id="last_name" required>
             </div>
         </div>
 
         <div class="form-group">
             <label for="email">อีเมล</label>
-            <input type="email" id="email" name="email" required>
+            <input type="email" id="email" required>
         </div>
 
         <div class="form-row">
             <div class="form-group">
                 <label for="department">แผนกงาน</label>
-                <input type="text" id="department" name="department" required>
+                <input type="text" id="department" required>
             </div>
             <div class="form-group">
                 <label for="phone">เบอร์โทรศัพท์</label>
-                <input type="text" id="phone" name="phone">
+                <input type="text" id="phone">
             </div>
         </div>
 
         <div class="form-group">
             <label for="password">รหัสผ่าน</label>
-            <input type="password" id="password" name="password" required minlength="6">
+            <input type="password" id="password" required minlength="6">
         </div>
 
         <div class="form-group">
             <label for="confirm_password">กรอกรหัสผ่านอีกครั้ง</label>
-            <input type="password" id="confirm_password" name="confirm_password" required minlength="6">
+            <input type="password" id="confirm_password" required minlength="6">
         </div>
 
-        <button type="submit" class="btn-submit">ลงทะเบียน</button>
+        <button type="submit" class="btn-submit" id="btnSubmit">ลงทะเบียน</button>
     </form>
 </div>
+
+<script>
+// ⚠️ ใส่ข้อมูล Supabase ของคุณตรงนี้
+const SUPABASE_URL = "https://YOUR_SUPABASE_URL.supabase.co";
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+
+document.getElementById('registerForm').addEventListener('submit', async function(e) {
+    e.preventDefault(); // ป้องกันการรีโหลดหน้าจอ
+    
+    const alertBox = document.getElementById('alert-box');
+    const btnSubmit = document.getElementById('btnSubmit');
+    
+    // ดึงค่าจากฟอร์ม
+    const firstName = document.getElementById('first_name').value.trim();
+    const lastName = document.getElementById('last_name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const department = document.getElementById('department').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirm_password').value;
+
+    // ซ่อนการแจ้งเตือนเก่าก่อน
+    alertBox.style.display = 'none';
+    alertBox.className = 'alert';
+
+    // 1. ตรวจสอบรหัสผ่านตรงกันไหม
+    if (password !== confirmPassword) {
+        showAlert("รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน", "danger");
+        return;
+    }
+
+    // เปิดสถานะกำลังโหลด
+    btnSubmit.disabled = true;
+    btnSubmit.innerText = "กำลังบันทึกข้อมูล...";
+
+    // เตรียมข้อมูลส่งในรูปแบบ JSON (ชื่อคีย์ต้องตรงกับคอลัมน์ใน SQL)
+    // หมายเหตุ: ฝั่ง JavaScript แนะนำให้บันทึกแบบ password ตรงๆ หรือแฮชฝั่ง Client ก่อนส่ง
+    const formData = {
+        email: email,
+        password_hash: password, // ในระบบจริงควรต่อยอดทำเรื่อง Auth หรือแฮชรหัสผ่าน
+        first_name: firstName,
+        last_name: lastName,
+        department: department,
+        phone: phone
+    };
+
+    try {
+        // ยิง Fetch API ไปที่ Supabase REST Endpoint
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/users`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (response.status === 201) {
+            showAlert("สมัครสมาชิกสำเร็จเรียบร้อยแล้ว!", "success");
+            document.getElementById('registerForm').reset(); // ล้างข้อมูลในฟอร์ม
+        } else {
+            showAlert("เกิดข้อผิดพลาด: อีเมลนี้อาจถูกใช้งานไปแล้ว หรือระบบขัดข้อง", "danger");
+        }
+    } catch (error) {
+        showAlert("ไม่สามารถเชื่อมต่อฐานข้อมูลได้", "danger");
+        console.error(error);
+    } finally {
+        // คืนสถานะปุ่ม
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = "ลงทะเบียน";
+    }
+});
+
+// ฟังก์ชันสำหรับควบคุมกล่องข้อความแจ้งเตือน
+function showAlert(text, type) {
+    const alertBox = document.getElementById('alert-box');
+    alertBox.innerText = text;
+    alertBox.classList.add(`alert-${type}`);
+    alertBox.style.display = 'block';
+}
+</script>
 
 </body>
 </html>
