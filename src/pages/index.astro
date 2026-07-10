@@ -4,6 +4,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 import './style.css';
+import './register.astro';
 ---
 
 <!DOCTYPE html>
@@ -35,7 +36,7 @@ import './style.css';
         <button type="submit" class="btn-submit" id="btnSubmit">เข้าสู่ระบบ</button>
         
         <div style="text-align: center; margin-top: 15px;">
-            <a href="/register.astro" class="btn-secondary" style="text-decoration: none; color: #555; font-size: 14px;">
+            <a href="/register" class="btn-secondary" style="text-decoration: none; color: #555; font-size: 14px;">
                 ยังไม่มีบัญชี? สมัครสมาชิกที่นี่
             </a>
         </div>
