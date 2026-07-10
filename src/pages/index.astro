@@ -5,45 +5,130 @@ import Footer from '../components/Footer.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-	
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-	</head>
-	<body>
-		<Header />
-		<main>
-			<h1>🧑‍🚀 ระบบทดสอบการใช้งาน!</h1>
-			<p>
-				ยินดีต้อนรับเข้าสู่ระบบทดสอบการใช้งาน
-			</p>
-			<p>
-				This template comes with a few integrations already configured in your
-				<code>astro.config.mjs</code> file. You can customize your setup with
-				<a href="https://astro.build/integrations">Astro Integrations</a> to add tools like Tailwind,
-				React, or Vue to your project.
-			</p>
-			<p>Here are a few ideas on how to get started with the template:</p>
-			<ul>
-				<li>Edit this page in <code>src/pages/index.astro</code></li>
-				<li>Edit the site header items in <code>src/components/Header.astro</code></li>
-				<li>Add your name to the footer in <code>src/components/Footer.astro</code></li>
-				<li>Check out the included blog posts in <code>src/content/blog/</code></li>
-				<li>Customize the blog post page layout in <code>src/layouts/BlogPost.astro</code></li>
-			</ul>
-			<p>
-				Have fun! If you get stuck, remember to <a href="https://docs.astro.build/"
-					>read the docs
-				</a> or <a href="https://astro.build/chat">join us on Discord</a> to ask questions.
-			</p>
-			<p>
-				Looking for a blog template with a bit more personality? Check out <a
-					href="https://github.com/Charca/astro-blog-template"
-					>astro-blog-template
-				</a> by <a href="https://twitter.com/Charca">Maxi Ferreira</a>.
-			</p>
-		</main>
-		<Footer />
-	</body>
+<?php
+$message = "";
+$message_type = "";
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // รับค่าจากฟอร์ม
+    $first_name = trim($_POST['first_name']);
+    $last_name = trim($_POST['last_name']);
+    $email = trim($_POST['email']);
+    $department = trim($_POST['department']);
+    $phone = trim($_POST['phone']);
+    $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+
+    // ตรวจสอบความถูกต้องเบื้องต้น
+    if ($password !== $confirm_password) {
+        $message = "รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน";
+        $message_type = "danger";
+    } else {
+        // เข้ารหัสรหัสผ่านเพื่อความปลอดภัย (บดบังรหัสผ่านจริง)
+        $password_hash = password_hash($password, PASSWORD_BCRYPT);
+
+        // ตั้งค่าการเชื่อมต่อ Supabase REST API
+        $supabase_url = "https://YOUR_SUPABASE_URL.supabase.co/rest/v1/users";
+        $supabase_key = "YOUR_SUPABASE_ANON_KEY";
+
+        // เตรียมข้อมูลส่งในรูปแบบ JSON
+        $data = array(
+            "email" => $email,
+            "password_hash" => $password_hash,
+            "first_name" => $first_name,
+            "last_name" => $last_name,
+            "department" => $department,
+            "phone" => $phone
+        );
+
+        // ส่งข้อมูลด้วย cURL
+        $ch = curl_init($supabase_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            "apikey: " . $supabase_key,
+            "Authorization: Bearer " . $supabase_key,
+            "Content-Type: application/json",
+            "Prefer: return=minimal" // ลดการส่งข้อมูลกลับเพื่อความเร็ว
+        ));
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        // ตรวจสอบสถานะการบันทึก (201 Created คือสำเร็จ)
+        if ($http_code == 201) {
+            $message = "สมัครสมาชิกสำเร็จเรียบร้อยแล้ว!";
+            $message_type = "success";
+        } else {
+            $message = "เกิดข้อผิดพลาด: อีเมลนี้อาจถูกใช้งานไปแล้ว หรือระบบขัดข้อง";
+            $message_type = "danger";
+        }
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สมัครสมาชิก</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="register-container">
+    <h2>สมัครสมาชิก</h2>
+
+    <?php if (!empty($message)): ?>
+        <div class="alert alert-<?php echo $message_type; ?>">
+            <?php echo $message; ?>
+        </div>
+    <?php endif; ?>
+
+    <form action="register.php" method="POST">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="first_name">ชื่อ</label>
+                <input type="text" id="first_name" name="first_name" required>
+            </div>
+            <div class="form-group">
+                <label for="last_name">นามสกุล</label>
+                <input type="text" id="last_name" name="last_name" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="email">อีเมล</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="department">แผนกงาน</label>
+                <input type="text" id="department" name="department" required>
+            </div>
+            <div class="form-group">
+                <label for="phone">เบอร์โทรศัพท์</label>
+                <input type="text" id="phone" name="phone">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="password">รหัสผ่าน</label>
+            <input type="password" id="password" name="password" required minlength="6">
+        </div>
+
+        <div class="form-group">
+            <label for="confirm_password">กรอกรหัสผ่านอีกครั้ง</label>
+            <input type="password" id="confirm_password" name="confirm_password" required minlength="6">
+        </div>
+
+        <button type="submit" class="btn-submit">ลงทะเบียน</button>
+    </form>
+</div>
+
+</body>
 </html>
