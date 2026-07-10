@@ -4,7 +4,6 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 import './style.css';
-import './register.astro';
 ---
 
 <!DOCTYPE html>
@@ -25,11 +24,11 @@ import './register.astro';
     <form id="loginForm">
         <div class="form-group">
             <label for="username">ชื่อผู้ใช้ (Username)</label>
-            <input type="text" id="username" required>
+            <input type="text" id="username" pattern="^[a-zA-Z0-9_\-]+$" title="กรุณาใช้ภาษาอังกฤษ ตัวเลข หรือเครื่องหมาย _ - เท่านั้น" required>
         </div>
 
         <div class="form-group">
-            <label for="password">รหัสผ่าน</label>
+            <label for="password">รหัสผ่าน (Password)</label>
             <input type="password" id="password" required>
         </div>
 
@@ -61,18 +60,31 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     const alertBox = document.getElementById('alert-box');
     const btnSubmit = document.getElementById('btnSubmit');
     
-    // เปลี่ยนการดึงค่าจาก email เป็น username
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
 
     alertBox.style.display = 'none';
     alertBox.className = 'alert';
 
+    // 🛠️ 1. ตรวจสอบว่า Username เป็นภาษาอังกฤษ/ตัวเลข เท่านั้น
+    const usernameRegex = /^[a-zA-Z0-9_\-]+$/;
+    if (!usernameRegex.test(username)) {
+        showAlert("ชื่อผู้ใช้ (Username) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือเครื่องหมาย _ และ - เท่านั้น", "danger");
+        return;
+    }
+
+    // 🛠️ 2. ตรวจสอบว่า Password ไม่มีภาษาไทยปนมา
+    const passwordRegex = /^[a-zA-Z0-9_@.\-#$!%*?&]+$/; 
+    if (!passwordRegex.test(password)) {
+        showAlert("รหัสผ่าน (Password) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือสัญลักษณ์สากลเท่านั้น (ห้ามใช้ภาษาไทย)", "danger");
+        return;
+    }
+
     btnSubmit.disabled = true;
     btnSubmit.innerText = "กำลังตรวจสอบข้อมูล...";
 
     try {
-        // 1. เปลี่ยนเงื่อนไขการค้นหาใน API จาก email เป็น username=eq....
+        // เงื่อนไขการค้นหาใน API จาก username=eq....
         const response = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(username)}`, {
             method: 'GET',
             headers: {
@@ -91,13 +103,13 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 
         const user = users[0];
 
-        // 2. ตรวจสอบว่าโดนระงับสิทธิ์อยู่หรือไม่
+        // ตรวจสอบว่าโดนระงับสิทธิ์อยู่หรือไม่
         if (user.is_suspended) {
             showAlert("บัญชีผู้ใช้ของคุณถูกระงับชั่วคราว โปรดติดต่อเจ้าหน้าที่", "danger");
             return;
         }
 
-        // 3. แฮชรหัสผ่านที่กรอกเข้ามาเทียบกับในฐานข้อมูล
+        // แฮชรหัสผ่านที่กรอกเข้ามาเทียบกับในฐานข้อมูล
         const hashedPassword = await hashPassword(password);
 
         if (user.password_hash === hashedPassword) {
