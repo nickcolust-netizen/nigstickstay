@@ -105,6 +105,7 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     // เตรียมข้อมูลส่งในรูปแบบ JSON (ชื่อคีย์ต้องตรงกับคอลัมน์ใน SQL)
     // หมายเหตุ: ฝั่ง JavaScript แนะนำให้บันทึกแบบ password ตรงๆ หรือแฮชฝั่ง Client ก่อนส่ง
     const formData = {
+        username: username,
         email: email,
         password_hash: password, // ในระบบจริงควรต่อยอดทำเรื่อง Auth หรือแฮชรหัสผ่าน
         first_name: firstName,
