@@ -23,8 +23,8 @@ import './style.css';
 
     <form id="loginForm">
         <div class="form-group">
-            <label for="email">อีเมล</label>
-            <input type="email" id="email" required>
+            <label for="username">ชื่อผู้ใช้ (Username)</label>
+            <input type="text" id="username" required>
         </div>
 
         <div class="form-group">
@@ -46,7 +46,7 @@ import './style.css';
 const SUPABASE_URL = "https://xkefwusrblrzylvtmwte.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrZWZ3dXNyYmxyenlsdnRtd3RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MjU1NjcsImV4cCI6MjA5OTIwMTU2N30.LMb9yfwpHQoZm30z7QwWJSL8eJ68n7qU8DiItlz0QwQ";
 
-// ฟังก์ชันแฮชรหัสผ่าน SHA-256 (เพื่อให้ตรงกับตอนสมัครสมาชิก)
+// ฟังก์ชันแฮชรหัสผ่าน SHA-256
 async function hashPassword(string) {
     const utf8 = new TextEncoder().encode(string);
     const hashBuffer = await crypto.subtle.digest('SHA-256', utf8);
@@ -59,7 +59,9 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 
     const alertBox = document.getElementById('alert-box');
     const btnSubmit = document.getElementById('btnSubmit');
-    const email = document.getElementById('email').value.trim();
+    
+    // เปลี่ยนการดึงค่าจาก email เป็น username
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
 
     alertBox.style.display = 'none';
@@ -69,8 +71,8 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     btnSubmit.innerText = "กำลังตรวจสอบข้อมูล...";
 
     try {
-        // 1. ดึงข้อมูลผู้ใช้จาก Email ก่อนเพื่อมาเช็กสถานะล็อกอิน
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(email)}`, {
+        // 1. เปลี่ยนเงื่อนไขการค้นหาใน API จาก email เป็น username=eq....
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/users?username=eq.${encodeURIComponent(username)}`, {
             method: 'GET',
             headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -88,7 +90,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 
         const user = users[0];
 
-        // 2. ตรวจสอบว่าโดนระงับสิทธิ์อยู่แล้วหรือไม่
+        // 2. ตรวจสอบว่าโดนระงับสิทธิ์อยู่หรือไม่
         if (user.is_suspended) {
             showAlert("บัญชีผู้ใช้ของคุณถูกระงับชั่วคราว โปรดติดต่อเจ้าหน้าที่", "danger");
             return;
@@ -111,7 +113,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
             });
 
             showAlert("เข้าสู่ระบบสำเร็จ!", "success");
-            // window.location.href = '/dashboard'; // สามารถเปิดบรรทัดนี้เพื่อ redirect ได้
+            // window.location.href = '/dashboard';
         } else {
             // ถ้ารหัสผิด -> นับจำนวนเพิ่มขึ้น 1
             const newAttempts = user.login_attempts + 1;
